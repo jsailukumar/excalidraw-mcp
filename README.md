@@ -59,15 +59,7 @@ Text responses can only go so far. Sometimes users need to interact with data, n
 
 ## Contributing
 
-PRs welcome! Here's how to get set up:
-
-```bash
-git clone https://github.com/antonpk1/excalidraw-mcp-app.git
-cd excalidraw-mcp-app
-npm install && npm run build
-```
-
-Run locally with `node dist/index.js` (HTTP on port 3001) or `node dist/index.js --stdio` (stdio for Claude Desktop).
+PRs welcome! See [Local](#local) above for build instructions.
 
 ### Deploy your own instance
 
