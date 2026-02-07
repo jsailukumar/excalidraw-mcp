@@ -8,6 +8,28 @@
   font-display: swap;
 }
 
+/* Preload Excalidraw UI fonts so they're cached before fullscreen mount.
+   Without this, Excalidraw loads them on component init, triggering a font
+   recalculation pass that corrupts text dimensions on first open. */
+@font-face {
+  font-family: "Assistant";
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Assistant";
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Assistant";
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -230,6 +252,59 @@ body {
 
 .main.fullscreen .html-container {
   height: 100vh;
+}
+
+/* Export modal overlay */
+.export-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.export-modal {
+  min-width: 320px;
+  max-width: 400px;
+  padding: 24px !important;
+}
+
+.export-modal-title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary-color, #1a1a1a);
+}
+
+.export-modal-text {
+  margin: 0 0 20px;
+  font-size: 0.875rem;
+  color: var(--color-gray-60, #666);
+  line-height: 1.4;
+}
+
+.export-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.export-modal-actions .standalone {
+  padding: 8px 16px !important;
+  width: auto !important;
+  height: auto !important;
+  font-size: 0.875rem;
+}
+
+.export-modal-confirm {
+  --button-bg: var(--color-primary, #6965db) !important;
+  --button-color: #fff !important;
+  --button-border: var(--color-primary, #6965db) !important;
+  --button-hover-bg: var(--color-primary-darker, #5b57d1) !important;
+  --button-hover-border: var(--color-primary-darker, #5b57d1) !important;
+  --button-hover-color: #fff !important;
 }
 
 .loading {

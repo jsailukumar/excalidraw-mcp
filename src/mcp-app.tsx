@@ -1,6 +1,6 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import type { App } from "@modelcontextprotocol/ext-apps";
-import { Excalidraw, exportToSvg, convertToExcalidrawElements, restore, CaptureUpdateAction, FONT_FAMILY } from "@excalidraw/excalidraw";
+import { Excalidraw, exportToSvg, convertToExcalidrawElements, restore, CaptureUpdateAction, FONT_FAMILY, serializeAsJSON } from "@excalidraw/excalidraw";
 import morphdom from "morphdom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -77,6 +77,89 @@ const ExpandIcon = () => (
     <path d="M1.5 12.5L6 8" />
   </svg>
 );
+
+const ExternalLinkIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 8.667V12.667C12 13.035 11.702 13.333 11.333 13.333H3.333C2.965 13.333 2.667 13.035 2.667 12.667V4.667C2.667 4.298 2.965 4 3.333 4H7.333" />
+    <path d="M10 2.667H13.333V6" />
+    <path d="M6.667 9.333L13.333 2.667" />
+  </svg>
+);
+
+async function shareToExcalidraw(api: any, app: App) {
+  try {
+    const elements = api.getSceneElements();
+    const appState = api.getAppState();
+    const files = api.getFiles();
+    if (!elements?.length) return;
+
+    // Serialize to Excalidraw JSON
+    const json = serializeAsJSON(elements, appState, files, "database");
+
+    // Proxy through server tool (avoids CORS on json.excalidraw.com)
+    const result = await app.callServerTool({
+      name: "export_to_excalidraw",
+      arguments: { json },
+    });
+
+    if (result.isError) {
+      fsLog(`export failed: ${JSON.stringify(result.content)}`);
+      return;
+    }
+
+    const url = (result.content[0] as any).text;
+    await app.openLink({ url });
+  } catch (err) {
+    fsLog(`shareToExcalidraw error: ${err}`);
+  }
+}
+
+function ShareButton({ onConfirm }: { onConfirm: () => Promise<void> }) {
+  const [state, setState] = useState<"idle" | "confirm" | "uploading">("idle");
+
+  const handleConfirm = async () => {
+    setState("uploading");
+    try {
+      await onConfirm();
+    } finally {
+      setState("idle");
+    }
+  };
+
+  return (
+    <>
+      <button
+        className="standalone"
+        style={{ display: "flex", alignItems: "center", gap: 5, width: "auto", padding: "0 10px", marginRight: -8 }}
+        title="Export to Excalidraw"
+        disabled={state === "uploading"}
+        onClick={() => setState("confirm")}
+      >
+        <ExternalLinkIcon />
+        <span style={{ fontSize: "0.75rem", fontWeight: 400 }}>{state === "uploading" ? "Exporting…" : "Export"}</span>
+      </button>
+
+      {state === "confirm" && (
+        <div className="export-modal-overlay" onClick={() => setState("idle")}>
+          <div className="Island export-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="export-modal-title">Export to Excalidraw</h3>
+            <p className="export-modal-text">
+              This will upload your diagram to excalidraw.com and open it in a new tab.
+            </p>
+            <div className="export-modal-actions">
+              <button className="standalone" onClick={() => setState("idle")}>
+                Cancel
+              </button>
+              <button className="standalone export-modal-confirm" onClick={handleConfirm}>
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 // ============================================================
 // Diagram component (Excalidraw SVG)
@@ -470,7 +553,20 @@ function ExcalidrawApp() {
     return () => document.removeEventListener("keydown", handler);
   }, [displayMode, toggleFullscreen]);
 
-  // Mount editor when entering fullscreen (only react to displayMode, not elements)
+  // Preload ALL Excalidraw fonts on first mount (inline mode) so they're
+  // cached before fullscreen. Without this, Excalidraw's component init
+  // downloads Assistant fonts, triggering a font recalc that corrupts
+  // text dimensions measured with not-yet-loaded Excalifont.
+  useEffect(() => {
+    Promise.all([
+      document.fonts.load('20px Excalifont'),
+      document.fonts.load('400 16px Assistant'),
+      document.fonts.load('500 16px Assistant'),
+      document.fonts.load('700 16px Assistant'),
+    ]).catch(() => {});
+  }, []);
+
+  // Mount editor when entering fullscreen
   useEffect(() => {
     if (displayMode !== "fullscreen") {
       setEditorReady(false);
@@ -478,9 +574,10 @@ function ExcalidrawApp() {
       setEditorSettled(false);
       return;
     }
-    document.fonts.ready.then(() => {
-      setTimeout(() => setEditorReady(true), 300);
-    });
+    (async () => {
+      await document.fonts.ready;
+      setTimeout(() => setEditorReady(true), 200);
+    })();
   }, [displayMode]);
 
   // After editor mounts: refresh text dimensions, then reveal
@@ -615,6 +712,13 @@ function ExcalidrawApp() {
             initialData={{ elements: elements as any, scrollToContent: true }}
             theme="light"
             onChange={(els) => onEditorChange(app, els)}
+            renderTopRightUI={() => (
+              <ShareButton
+                onConfirm={async () => {
+                  if (excalidrawApi) await shareToExcalidraw(excalidrawApi, app);
+                }}
+              />
+            )}
           />
         </div>
       )}

@@ -60652,6 +60652,7 @@ var EMPTY_COMPLETION_RESULT = {
 // src/server.ts
 import fs from "node:fs/promises";
 import path from "node:path";
+import { deflateSync } from "node:zlib";
 var DIST_DIR = import.meta.filename.endsWith(".ts") ? path.join(import.meta.dirname, "..", "dist") : import.meta.dirname;
 var RECALL_CHEAT_SHEET = `# Excalidraw Element Format
 
@@ -60984,6 +60985,60 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
   To remove elements from the restored state, use: {"type":"deleteElement","id":"<elementId>"}` }],
       structuredContent: { checkpointId }
     };
+  });
+  hk(server, "export_to_excalidraw", {
+    description: "Upload diagram to excalidraw.com and return shareable URL.",
+    inputSchema: { json: exports_external.string().describe("Serialized Excalidraw JSON") },
+    _meta: { ui: { visibility: ["app"] } }
+  }, async ({ json: json2 }) => {
+    try {
+      const remappedJson = json2;
+      const concatBuffers = (...bufs) => {
+        let total = 4;
+        for (const b2 of bufs)
+          total += 4 + b2.length;
+        const out = new Uint8Array(total);
+        const dv2 = new DataView(out.buffer);
+        dv2.setUint32(0, 1);
+        let off = 4;
+        for (const b2 of bufs) {
+          dv2.setUint32(off, b2.length);
+          off += 4;
+          out.set(b2, off);
+          off += b2.length;
+        }
+        return out;
+      };
+      const te2 = new TextEncoder;
+      const fileMetadata = te2.encode(JSON.stringify({}));
+      const dataBytes = te2.encode(remappedJson);
+      const innerPayload = concatBuffers(fileMetadata, dataBytes);
+      const compressed = deflateSync(Buffer.from(innerPayload));
+      const cryptoKey = await globalThis.crypto.subtle.generateKey({ name: "AES-GCM", length: 128 }, true, ["encrypt"]);
+      const iv2 = globalThis.crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await globalThis.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv2 }, cryptoKey, compressed);
+      const encodingMeta = te2.encode(JSON.stringify({
+        version: 2,
+        compression: "pako@1",
+        encryption: "AES-GCM"
+      }));
+      const payload = Buffer.from(concatBuffers(encodingMeta, iv2, new Uint8Array(encrypted)));
+      const res = await fetch("https://json.excalidraw.com/api/v2/post/", {
+        method: "POST",
+        body: payload
+      });
+      if (!res.ok)
+        throw new Error(`Upload failed: ${res.status}`);
+      const { id } = await res.json();
+      const jwk = await globalThis.crypto.subtle.exportKey("jwk", cryptoKey);
+      const url2 = `https://excalidraw.com/#json=${id},${jwk.k}`;
+      return { content: [{ type: "text", text: url2 }] };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Export failed: ${err.message}` }],
+        isError: true
+      };
+    }
   });
   const cspMeta = {
     ui: {
