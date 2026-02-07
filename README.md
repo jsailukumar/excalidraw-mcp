@@ -16,9 +16,6 @@ Add as a remote MCP server in your client. For example, in [claude.ai](https://c
 
 ### Local
 
-<details>
-<summary>Download extension or build from source</summary>
-
 **Option A: Download Extension**
 
 1. Download `excalidraw-mcp-app.mcpb` from [Releases](https://github.com/antonpk1/excalidraw-mcp-app/releases)
@@ -46,8 +43,6 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```
 
 Restart Claude Desktop.
-
-</details>
 
 ## Usage
 
